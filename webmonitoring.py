@@ -10,6 +10,7 @@ import cherrypy
 import signal
 import socket
 import sys
+import os
 
 import meteo
 import plot
@@ -161,7 +162,7 @@ if __name__ == '__main__':
             "tools.staticdir.on": True,
             "tools.staticdir.dir": "plots",
             "tools.staticdir.index": 'index.html',
-            "tools.staticdir.root": "/home/alek/J-PET/meteo_station/newmonitoring/",
+            "tools.staticdir.root": os.getcwd(),
         }
     }
 

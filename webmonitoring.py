@@ -20,7 +20,7 @@ daq_path = '/data/DAQ/'
 
 db_path = './conditions_db.sqlite'
 
-update_time = 60 # seconds
+update_time = 300 # seconds
 
 # for connection to the meteo station
 sock = socket.socket(socket.AF_INET, # Internet

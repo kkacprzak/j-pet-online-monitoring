@@ -52,7 +52,7 @@ def __makePlot(generator, arrs, outpath, filename):
     
     plt.show()
     fig.savefig(outpath + filename)
-    
+    plt.close(fig)
     
 def plotMeteoStuff(data, outpath):
     

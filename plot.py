@@ -32,14 +32,15 @@ def __makeArrays(data):
 ##########################################################################
 # Create a single figure and write to disk                               #
 ##########################################################################
-def __makePlot(generator, arrs, outpath, filename):
+def __makePlot(generator, arrs, outpath, filename, ylabel):
 
     fmt = dates.DateFormatter("%d %b %H:%M")
     fig, ax = plt.subplots()
     ax.xaxis.set_major_locator(dates.HourLocator())
     ax.xaxis.set_minor_locator(dates.MinuteLocator(interval=30))
     ax.xaxis.set_major_formatter(fmt)    
-
+    ax.set_ylabel(ylabel)
+    
     plots = generator(arrs, ax)
 
     # Put a legend above current axis
@@ -62,25 +63,25 @@ def plotMeteoStuff(data, outpath):
     # plot temperatures                                              #
     ##################################################################
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[1][i], label='T'+str(i)) for i in range(10)]
-    __makePlot(gen, arrays, 'plots/', 'temp.png')
+    __makePlot(gen, arrays, 'plots/', 'temp.png', 'C')
     
     ##################################################################
     # plot vacuum system pressures                                   #
     ##################################################################
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[2][i], label='P'+str(i-1)) for i in range(1,3)]
-    __makePlot(gen, arrays, 'plots/', 'pressure.png')
+    __makePlot(gen, arrays, 'plots/', 'pressure.png', 'mbar')
 
     ######################################################################
     # plot atm pressure                                                  #
     ######################################################################
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[2][0], label='P atm')]
-    __makePlot(gen, arrays, 'plots/', 'patm.png')
+    __makePlot(gen, arrays, 'plots/', 'patm.png', 'Pa')
 
     ######################################################################
     # plot humidities                                                    #
     ######################################################################
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[3][i], label='Humidity '+str(i)) for i in range(2)]
-    __makePlot(gen, arrays, 'plots/', 'humidities.png')
+    __makePlot(gen, arrays, 'plots/', 'humidities.png', '%')
     
     logger.debug("Plotting done.")
 

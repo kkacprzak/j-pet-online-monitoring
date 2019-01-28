@@ -36,8 +36,8 @@ def __makePlot(generator, arrs, outpath, filename, ylabel):
 
     fmt = dates.DateFormatter("%d %b %H:%M")
     fig, ax = plt.subplots()
-    ax.xaxis.set_major_locator(dates.HourLocator())
-    ax.xaxis.set_minor_locator(dates.MinuteLocator(interval=30))
+    ax.xaxis.set_major_locator(dates.HourLocator(interval=3))
+    ax.xaxis.set_minor_locator(dates.MinuteLocator(interval=10))
     ax.xaxis.set_major_formatter(fmt)    
     ax.set_ylabel(ylabel)
     

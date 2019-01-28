@@ -71,9 +71,9 @@ def plotMeteoStuff(data, outpath):
     ##################################################################
     def pressures_generator(arrs, axis):
         plots = []
-        plots.append(axis.plot(arrs[0], arrs[2][0], 'b', label='vacuum system pressures'))
+        plots.append(axis.plot(arrs[0], arrs[2][1], 'b', label='vacuum system pressures'))
         axis2 = axis.twinx()
-        plots.append(axis2.plot(arrs[0], arrs[2][1], 'r', label='P1'))
+        plots.append(axis2.plot(arrs[0], arrs[2][2], 'r', label='P1'))
         axis.tick_params('y', colors='b')
         axis.set_ylabel('P0 [Pa]', color='b')
         axis2.tick_params('y', colors='r')

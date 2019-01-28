@@ -75,12 +75,12 @@ def plotMeteoStuff(data, outpath):
         axis2 = axis.twinx()
         plots.append(axis2.plot(arrs[0], arrs[2][1], 'r', label='P1'))
         axis.tick_params('y', colors='b')
-        axis.set_ylabel('P0 [mbar]', color='b')
+        axis.set_ylabel('P0 [Pa]', color='b')
         axis2.tick_params('y', colors='r')
-        axis2.set_ylabel('P1 [mbar]', color='r')
+        axis2.set_ylabel('P1 [Pa]', color='r')
         return plots
         
-    __makePlot(pressures_generator, arrays, 'plots/', 'pressure.png', 'mbar')
+    __makePlot(pressures_generator, arrays, 'plots/', 'pressure.png', 'Pa')
 
     ######################################################################
     # plot atm pressure                                                  #

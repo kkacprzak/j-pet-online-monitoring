@@ -7,10 +7,12 @@ from plot import plotMeteoStuff
 from shellchecks import *
 import time
 import cherrypy
+from cherrypy.lib.static import serve_fileobj
 import signal
 import socket
 import sys
 import os
+import StringIO
 
 import meteo
 import plot
@@ -130,6 +132,17 @@ class Root(object):
         <IMG SRC="./plots/humidities.png" ALIGN="BOTTOM"> 
         </CENTER> 
         <DIV><h3>Time difference between server and meteo PC: %d seconds</h3></DIV>
+        <DIV>
+        <form method="get" action="fetch_records">
+        <h2>Download conditions data for time range:</h2>
+        From: <input type="date" id="records_range_beg" name="records_range_beg" value="2019-01-16">
+        <input type="time" id="records_range_beg_time" name="records_range_beg_time" value="00:00">
+        To: <input type="date" id="records_range_end" name="records_range_end" value="2019-01-17">
+        <input type="time" id="records_range_end_time" name="records_range_end_time" value="00:00">
+        <br>
+        <input type="submit" value="Download data">
+        </form>
+        </DIV>
         </BODY>
         </HTML>
         """ % (update_time,
@@ -140,12 +153,32 @@ class Root(object):
            #     str(int(current_time-self.recent_file[0]))
            # )
 
-
         # <DIV><h3>Most recent folder %s</h3></DIV>
         # <DIV><h3>Most recent HLD file %s</h3></DIV>
         # <DIV><h3>Last access %s seconds ago</h3></DIV>
            
         return s
+
+    @cherrypy.expose
+    def fetch_records(self, records_range_beg, records_range_beg_time, records_range_end, records_range_end_time):
+
+        beg_time = datetime.strptime(records_range_beg + 'T' + records_range_beg_time, '%Y-%m-%dT%H:%M')
+        end_time = datetime.strptime(records_range_end + 'T' + records_range_end_time, '%Y-%m-%dT%H:%M')
+
+        logger.debug("User requested DB data for time range " +
+                     beg_time.isoformat() + " and " +
+                     end_time.isoformat()
+        )
+
+        cherrypy.response.headers['Content-Type'] = "text/plain"
+        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="conditions.txt"'
+
+        records = meteo.getRecordsBetween(beg_time, end_time)
+        file_path = plots_path + '/conditions_data.txt'
+        with open(file_path, 'w') as f:
+            f.write(meteo.recreateTextFile(records))
+        buffer = StringIO.StringIO(meteo.recreateTextFile(records))
+        return serve_fileobj(buffer, "application/x-download", "attachment", name="conditions_data.txt")
 
 if __name__ == '__main__':
     conf = {
@@ -171,9 +204,9 @@ if __name__ == '__main__':
     def signal_handler(sig, frame):
         print('You pressed Ctrl+C!')
         logger.info("SIGINT received, cleaning up and exiting.")
+
         
         sock.close()
-
         cherrypy.engine.exit()
         
         sys.exit(0)
@@ -199,8 +232,8 @@ if __name__ == '__main__':
 
     # control event loop
     while True:
+        time.sleep(update_time)
         state["x"] = state["x"] + 1
         for f in checks:
+            state["readout_time"] = datetime.now()
             f(state)
-        state["readout_time"] = datetime.now()
-        time.sleep(update_time)

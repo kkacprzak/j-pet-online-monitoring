@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+import dateutil.parser as dp
 import math
 import logging
 
@@ -118,7 +119,11 @@ def __writeRecord(data):
         if con:
             con.close()
 
-def getRecordsSince(timestamp):
+def getRecordsSince(beg):
+    end = datetime.now()
+    return getRecordsBetween(beg, end)
+    
+def getRecordsBetween(beg, end):
 
     con = None
     logger.debug( "ATTEMPTING TO OPEN DB: " + db_filename + " FOR READING")
@@ -128,10 +133,10 @@ def getRecordsSince(timestamp):
         cursor = con.cursor()
 
         sql = """SELECT *
-        FROM "%s" WHERE datetime(SERVER_TIME) > datetime(?) 
+        FROM "%s" WHERE datetime(SERVER_TIME) BETWEEN datetime(?) and datetime(?) 
         order by datetime(SERVER_TIME) asc;""" % (table_name,)
 
-        cursor.execute(sql, (timestamp.isoformat(),))        
+        cursor.execute(sql, (beg.isoformat(), end.isoformat()))        
         return cursor.fetchall()
 
     except sqlite3.Error, e:
@@ -141,6 +146,25 @@ def getRecordsSince(timestamp):
         if con:
             con.close()
 
+def recreateTextFile(data):
+    '''This method creates a text buffer mimicking the format
+    of the text log files produced by the meteo station'''
+
+    buffer = ""
+
+    for entry in data:
+        line = dp.parse(entry[1]).strftime('%Y-%m-%d %H:%M:%S') + ' > '
+        for i in xrange(10):
+            line = line + '#' + str(i) + ': ' + str(entry[8+i]) + '; '
+        line = line + 'H0: ' + str(entry[6]) + '; '
+        line = line + 'H1: ' + str(entry[7]) + '; '
+        line = line + 'P: ' + str(entry[3]) + ' Pa; '
+        line = line + 'P1: ' + str(entry[4]) + ' Pa; '
+        line = line + 'P2: ' + str(entry[5]) + ' Pa;'
+        line = line + "\n"
+        buffer = buffer + line
+        
+    return buffer
 
 if __name__ == "__main__":
 
@@ -156,12 +180,10 @@ if __name__ == "__main__":
         'dabc_2342367.hld'
     )
 
-    # the ultimat test and example of usage
+    # the ultimate test and example of usage
     
     initDB('test2.sqlite')    
 
-#    line = "2019-01-14 15:44:28 > #0: 24.00; #1: 21.70; #2: 20.60; #3: 20.30; #4: 28.90; #5: 20.30; #6: 19.70; #7: 21.50; #8: 24.40; #9: 21.70; H0: 15.00; H1: 31.20; P: 97176.00 Pa; P1: NaN mbar; P2: NaN mbar; \n"
-   
     with open('meteo_data.txt') as f:
         for line in f:
             writeRecord(line, datetime.now(), 'zyx')

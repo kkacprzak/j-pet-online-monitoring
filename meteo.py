@@ -159,8 +159,8 @@ def recreateTextFile(data):
         line = line + 'H0: ' + str(entry[6]) + '; '
         line = line + 'H1: ' + str(entry[7]) + '; '
         line = line + 'P: ' + str(entry[3]) + ' Pa; '
-        line = line + 'P1: ' + str(entry[4]) + ' mbar; '
-        line = line + 'P2: ' + str(entry[5]) + ' mbar;'
+        line = line + 'P1: ' + str(entry[4]) + ' Pa; '
+        line = line + 'P2: ' + str(entry[5]) + ' Pa;'
         line = line + "\n"
         buffer = buffer + line
         
@@ -180,13 +180,11 @@ if __name__ == "__main__":
         'dabc_2342367.hld'
     )
 
-    # the ultimat test and example of usage
+    # the ultimate test and example of usage
     
-#    initDB('test2.sqlite')    
+    initDB('test2.sqlite')    
 
-#    line = "2019-01-14 15:44:28 > #0: 24.00; #1: 21.70; #2: 20.60; #3: 20.30; #4: 28.90; #5: 20.30; #6: 19.70; #7: 21.50; #8: 24.40; #9: 21.70; H0: 15.00; H1: 31.20; P: 97176.00 Pa; P1: NaN mbar; P2: NaN mbar; \n"
-   
-    # with open('meteo_data.txt') as f:
-    #     for line in f:
-    #         writeRecord(line, datetime.now(), 'zyx')
+    with open('meteo_data.txt') as f:
+        for line in f:
+            writeRecord(line, datetime.now(), 'zyx')
 

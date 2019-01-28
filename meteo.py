@@ -152,15 +152,21 @@ def recreateTextFile(data):
 
     buffer = ""
 
+    def makeFloat(x):
+        if x is None:
+            return "NaN"
+        else:
+            return str(x)
+        
     for entry in data:
         line = dp.parse(entry[1]).strftime('%Y-%m-%d %H:%M:%S') + ' > '
         for i in xrange(10):
-            line = line + '#' + str(i) + ': ' + str(entry[8+i]) + '; '
-        line = line + 'H0: ' + str(entry[6]) + '; '
-        line = line + 'H1: ' + str(entry[7]) + '; '
-        line = line + 'P: ' + str(entry[3]) + ' Pa; '
-        line = line + 'P1: ' + str(entry[4]) + ' Pa; '
-        line = line + 'P2: ' + str(entry[5]) + ' Pa;'
+            line = line + '#' + str(i) + ': ' + makeFloat(entry[8+i]) + '; '
+        line = line + 'H0: ' + makeFloat(entry[6]) + '; '
+        line = line + 'H1: ' + makeFloat(entry[7]) + '; '
+        line = line + 'P: ' + makeFloat(entry[3]) + ' Pa; '
+        line = line + 'P1: ' + makeFloat(entry[4]) + ' Pa; '
+        line = line + 'P2: ' + makeFloat(entry[5]) + ' Pa;'
         line = line + "\n"
         buffer = buffer + line
         

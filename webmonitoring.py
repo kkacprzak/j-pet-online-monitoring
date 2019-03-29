@@ -78,9 +78,6 @@ def makePlots(S):
 
 def backupDB(S):
     timestamp = state["readout_time"].strftime('%Y-%m-%dT%H:%M:%S')
-    print state["readout_time"]
-    print meteo.last_db_backup_time
-    print state["readout_time"].day - meteo.last_db_backup_time.day
     if state["readout_time"].day - meteo.last_db_backup_time.day > 0:
         meteo.dumpDBtoFile(db_backup_path + 'db_' + timestamp + '.sql')
     

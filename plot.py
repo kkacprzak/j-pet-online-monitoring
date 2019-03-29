@@ -73,6 +73,7 @@ def plotMeteoStuff(data, outpath):
         plots = []
         plots.append(axis.plot(arrs[0], arrs[2][1], 'b', label='vacuum system pressures'))
         axis2 = axis.twinx()
+        axis2.xaxis.set_major_formatter(dates.DateFormatter("%d %b %H:%M"))    
         plots.append(axis2.plot(arrs[0], arrs[2][2], 'r', label='P1'))
         axis.tick_params('y', colors='b')
         axis.set_ylabel('P0 [Pa]', color='b')

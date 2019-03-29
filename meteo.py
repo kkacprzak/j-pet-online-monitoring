@@ -3,10 +3,12 @@ from datetime import datetime
 import dateutil.parser as dp
 import math
 import logging
+from backports import lzma
 
 table_name = 'conditions'
-
 db_filename = ""
+
+last_db_backup_time = datetime(1970,1,1)
 
 logger = logging.getLogger('meteo')
 
@@ -171,6 +173,33 @@ def recreateTextFile(data):
         buffer = buffer + line
         
     return buffer
+
+def dumpDBtoFile(db_backup_file = './db_backup.sql'):
+    '''Creates an SQL file from the contents of the SQLite DB.
+    This is intended for periodic backup of the DB.'''
+    
+    global last_db_backup_time
+
+    try:
+        con = sqlite3.connect(db_filename)
+        cursor = con.cursor()
+        
+        with lzma.open(db_backup_file+'.xz', 'w') as f:
+            for line in con.iterdump():
+                f.write('%s\n' % line)
+
+        logger.debug("DB contents were dumped to an SQL file:  " + str(db_backup_file))
+        last_db_backup_time = datetime.now()
+
+    except sqlite3.Error, e:
+        logger.error("Error in dumping the DB to an SQL file.")
+        return
+    finally:
+        if con:
+            con.close()
+
+    return
+
 
 if __name__ == "__main__":
 

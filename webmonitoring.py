@@ -21,6 +21,7 @@ plots_path = 'plots/'
 daq_path = '/data/DAQ/'
 
 db_path = './conditions_db.sqlite'
+db_backup_path = '../db_backup/'
 
 update_time = 300 # seconds
 
@@ -74,11 +75,20 @@ def getDataForPlots(S):
 
 def makePlots(S):
     plot.plotMeteoStuff(S["meteo_data"], plots_path)
+
+def backupDB(S):
+    timestamp = state["readout_time"].strftime('%Y-%m-%dT%H:%M:%S')
+    print state["readout_time"]
+    print meteo.last_db_backup_time
+    print state["readout_time"].day - meteo.last_db_backup_time.day
+    if state["readout_time"].day - meteo.last_db_backup_time.day > 0:
+        meteo.dumpDBtoFile(db_backup_path + 'db_' + timestamp + '.sql')
     
 checks = (
     checkMeteoStation,
     getDataForPlots,
-    makePlots
+    makePlots,
+    backupDB
 )
 
 
@@ -233,7 +243,6 @@ if __name__ == '__main__':
     # control event loop
     while True:
         time.sleep(update_time)
-        state["x"] = state["x"] + 1
         for f in checks:
             state["readout_time"] = datetime.now()
             f(state)

@@ -63,6 +63,7 @@ def checkMeteoStation(S):
     line = readMeteoStation()
     read_time = datetime.now()
     data = meteo.writeRecord(line, read_time, 'zyx')
+
     logger.debug("Written data to DB: " + str(data))
     # check time offset between meteo028 PC and server
     dt = dp.parse(data[0]) - read_time
@@ -78,7 +79,7 @@ def makePlots(S):
 
 def backupDB(S):
     timestamp = state["readout_time"].strftime('%Y-%m-%dT%H:%M:%S')
-    if state["readout_time"].day - meteo.last_db_backup_time.day > 0:
+    if (state["readout_time"] - meteo.last_db_backup_time).days > 0:
         meteo.dumpDBtoFile(db_backup_path + 'db_' + timestamp + '.sql')
     
 checks = (

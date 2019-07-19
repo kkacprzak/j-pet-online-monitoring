@@ -6,6 +6,7 @@ Software for continuous monitoring of the datataking conditions in the J-PET exp
 * CherryPy<18.0.0
 * numpy
 * matplotlib
+* backports.lzma
 
 ## Example preparation of a local virtual environment
 ```sh
@@ -14,6 +15,7 @@ python2 -m virtualenv online_monitoring
 source online_monitoring/bin/activate
 pip2 install CherryPy
 pip2 install matplotlib
+pip install backports.lzma
 ```
 
 ## Before first usage:

@@ -10,6 +10,12 @@ import logging
 
 logger = logging.getLogger('plotting')
 
+def __validateNumber(num):
+    if num is not None:
+        return num
+    else:
+        return 0.0
+
 def __makeArrays(data):
 
     times = np.array([dp.parse(line[2]) for line in data])
@@ -20,7 +26,7 @@ def __makeArrays(data):
 
     pressures = []    
     for i in range(3):
-        pressures.append(np.array([line[3+i] for line in data]))
+        pressures.append(np.array([__validateNumber(line[3+i]) for line in data]))
 
     humidities = []    
     for i in range(2):

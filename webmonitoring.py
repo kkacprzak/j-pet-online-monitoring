@@ -5,6 +5,7 @@ from datetime import datetime
 import dateutil.parser as dp
 from plot import plotMeteoStuff
 from shellchecks import *
+from rootchecks import *
 import time
 import cherrypy
 from cherrypy.lib.static import serve_fileobj
@@ -23,46 +24,63 @@ daq_path = '/data/DAQ/'
 db_path = './conditions_db.sqlite'
 db_backup_path = '../db_backup/'
 
-update_time = 300 # seconds
+#update_time = 300 # seconds
+update_time = 60 # seconds
 
 # for connection to the meteo station
 sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
-server_address = ("172.16.32.127", 5143)
+sock.settimeout(10.0)
+
+server_address = ("172.16.32.107", 5143)
 
 # for writing to DB
 meteo.initDB(db_path)
 
 # init logging
-# Create a custom logger
-logger = logging.getLogger('web_monitoring')
-
 log_file_name = 'conditions_monitoring_' + time.strftime('%d-%m-%Y_%H-%M') + '.log'
 logging.basicConfig(filename=log_file_name, level=logging.DEBUG,
                     format = '%(asctime)s - [%(name)s] %(levelname)s: %(message)s',
                     datefmt = '%m/%d/%Y %I:%M:%S %p')
 
+# Create a custom logger
+logger = logging.getLogger('web_monitoring')
+
+# Silence info from Cherrypy
+cherrypy.log.access_log.propagate = False
+cherrypy.log.error_log.propagate = False
+
 state = {
     "x" : 0,
     "meteo_data" : [],
     "meteo_time_offset" : 0, # in seconds
-    "readout_time" : None
+    "readout_time" : None,
+    "monitoring_file" : "-",
+    "event_counts" : -1,
+    "events_sum" : 0,
+    "reset_events": False
 }
 
 
 def readMeteoStation():
+    sock.sendto("Q", server_address)
     try:
-        sock.sendto("Q", server_address)
         data = sock.recv(1024) # buffer size is 1024 bytes
-        logger.debug("Received data from meteo server: " + data.strip())
-        return data
-    except:
-        logger.error("In connection to meteo station: " + str(sys.exc_info()[0]))
-
+    except socket.timeout:
+        logger.error("Timeout reached waiting for meteo data, skipping readout")
+        raise Exception
+    logger.debug("Received data from meteo server: " + data.strip())
+    return data
+        
 def checkMeteoStation(S):
-    line = readMeteoStation()
+    try:
+        line = readMeteoStation()
+    except Exception as err:
+        logger.error("readMeteoStation failed, skipping this readout")
+        return
+    
     read_time = datetime.now()
-    data = meteo.writeRecord(line, read_time, 'zyx')
+    data = meteo.writeRecord(line, read_time, 'zyx', S["monitoring_file"], S["event_counts"], S["events_sum"])
 
     logger.debug("Written data to DB: " + str(data))
     # check time offset between meteo028 PC and server
@@ -76,16 +94,30 @@ def getDataForPlots(S):
 
 def makePlots(S):
     plot.plotMeteoStuff(S["meteo_data"], plots_path)
-
+    plot.plotEventCounts(S["meteo_data"], plots_path)
+    
 def backupDB(S):
     timestamp = state["readout_time"].strftime('%Y-%m-%dT%H:%M:%S')
     if (state["readout_time"] - meteo.last_db_backup_time).days > 0:
         meteo.dumpDBtoFile(db_backup_path + 'db_' + timestamp + '.sql')
-    
+
+def checkDataMonitoring(S):
+    monitoring_file = getMostRecentMonitoringFile()
+    if monitoring_file != S["monitoring_file"]:
+        S["monitoring_file"] = monitoring_file
+        event_counts = getEntriesFromHisto(S["monitoring_file"])
+        if S["reset_events"]:
+            S["events_sum"] = 0
+            logger.info("Resetting intergrated events counter by user request.")
+            S["reset_events"] = False
+        S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts)
+        S["event_counts"] = event_counts
+        
 checks = (
-    checkMeteoStation,
     getDataForPlots,
     makePlots,
+    checkDataMonitoring,
+    checkMeteoStation,
     backupDB
 )
 
@@ -133,11 +165,20 @@ class Root(object):
         </HEAD>
         <BODY BGCOLOR="FFFFFF">
         <DIV><h2>Status at: %s (last readout time)</h2></DIV>
+        <DIV><h3>Most recent monitoring file: <a href="http://172.16.32.156/monitoring2/monitoring.htm?filename=%s">%s</a></h3></DIV>
+        <DIV><h3>Entries from most recent monitoring file %s</h3></DIV>
         <CENTER>
         <IMG SRC="./plots/temp.png" ALIGN="BOTTOM"> 
         <IMG SRC="./plots/pressure.png" ALIGN="BOTTOM"> 
         <IMG SRC="./plots/patm.png" ALIGN="BOTTOM"> 
         <IMG SRC="./plots/humidities.png" ALIGN="BOTTOM"> 
+        <IMG SRC="./plots/events.png" ALIGN="BOTTOM"> 
+        <DIV>
+        <IMG SRC="./plots/integrated_events.png" ALIGN="BOTTOM"> 
+        <form method="get" action="reset_events">        
+        <input type="submit" value="Reset counting">
+        </form>
+        </DIV>
         </CENTER> 
         <DIV><h3>Time difference between server and meteo PC: %d seconds</h3></DIV>
         <DIV>
@@ -155,7 +196,11 @@ class Root(object):
         </HTML>
         """ % (update_time,
                readout_time,
-               state["meteo_time_offset"],)
+               state["monitoring_file"],
+               state["monitoring_file"],
+               str(state["event_counts"]),
+               state["meteo_time_offset"]
+        )
            #     self.recent_folder[1],
            #     os.path.basename(self.recent_file[1]),
            #     str(int(current_time-self.recent_file[0]))
@@ -164,9 +209,14 @@ class Root(object):
         # <DIV><h3>Most recent folder %s</h3></DIV>
         # <DIV><h3>Most recent HLD file %s</h3></DIV>
         # <DIV><h3>Last access %s seconds ago</h3></DIV>
-           
+        
         return s
 
+    @cherrypy.expose
+    def reset_events(self):
+        state["reset_events"] = True
+        return "The event counter has been reset."
+        
     @cherrypy.expose
     def fetch_records(self, records_range_beg, records_range_beg_time, records_range_end, records_range_end_time):
 

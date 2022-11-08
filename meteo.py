@@ -49,7 +49,10 @@ def initDB(filename):
                 T7 REAL,
                 T8 REAL,
                 T9 REAL,
-                LAST_HLD TEXT
+                LAST_HLD TEXT,
+                LAST_MONITORING_FILE TEXT,
+                EVENT_COUNTS INTEGER,
+                EVENTS_SUM INTEGER
                 )''' % (table_name))
             logger.debug("DB table did not exist, creating one.")
     
@@ -64,14 +67,16 @@ def initDB(filename):
 
 def extractValue(line, position):
     words = line[position].split(' ')
-    value = float(words[2]) 
+    value = 0.0
+    if words[2]!='NaN':
+        value = float(words[2]) 
     return value
     
 def extractTimestamp(line):
     words = line[0].split(' ')
     return datetime.strptime(words[0]+" "+words[1], '%Y-%m-%d %H:%M:%S').isoformat()
 
-def makeData(line, read_time, last_hld):
+def makeData(line, read_time, last_hld, last_monitoring_file, event_count, events_sum):
 
     data = []
     line = line.strip()
@@ -81,10 +86,13 @@ def makeData(line, read_time, last_hld):
     for pos in xrange(1,16):
         data.append(extractValue(line, pos))
     data.append(last_hld)
+    data.append(last_monitoring_file)
+    data.append(event_count)
+    data.append(events_sum)
     return data
 
-def writeRecord(line, timestamp, hld_file):
-    data = makeData(line, timestamp, hld_file)
+def writeRecord(line, timestamp, hld_file, last_monitoring_file, event_count, events_sum):
+    data = makeData(line, timestamp, hld_file, last_monitoring_file, event_count, events_sum)
     __writeRecord(data)
     return data
     
@@ -101,11 +109,17 @@ def __writeRecord(data):
         sql = '''INSERT INTO %s(STATION_TIME,SERVER_TIME,
         T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,
         HUM1,HUM2,P_ATM,P1,P2,
-        LAST_HLD) 
+        LAST_HLD,
+        LAST_MONITORING_FILE,
+        EVENT_COUNTS,
+        EVENTS_SUM) 
         VALUES(
         ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
+        ?,
+        ?,
+        ?,
         ?
         );''' % table_name
         

@@ -29,4 +29,4 @@ def calculateEventsIncrement(old_count, new_count):
     return avg_count * readFrequencyOfFiles()
     
 if __name__ == '__main__':
-    print getEntriesFromHisto(getMostRecentMonitoringFile())
+    print(getEntriesFromHisto(getMostRecentMonitoringFile()))

@@ -111,8 +111,9 @@ def getDataForPlots(S):
     S["meteo_data"] =  meteo.getRecordsSince(now + retro_shift)
 
 def makePlots(S):
-    plot.plotMeteoStuff(S["meteo_data"], plots_path)
-    plot.plotEventCounts(S["meteo_data"], plots_path)
+    data = list(S["meteo_data"])
+    plot.plotMeteoStuff(data, plots_path)
+    plot.plotEventCounts(data, plots_path)
     
 def backupDB(S):
     timestamp = state["readout_time"].strftime('%Y-%m-%d %H:%M:%S')
@@ -121,15 +122,34 @@ def backupDB(S):
 
 def checkDataMonitoring(S):
     monitoring_file = getMostRecentMonitoringFile()
+    mrf = getMostRecentFolder('/data/djpet/data/DAQ/', 'DJ_*')
+    try:
+        fl = listHLDfiles(mrf)
+        S["last_hld_file"] = getMostRecentFile(fl)
+    except NoFilesError as e:
+        logger.error("Error in finding most revent HLD file: " +  str(e) + ". Most recent file is not updated.")
+
+    try:
+        inter_file_interval = getInterFileInterval(fl)
+    except:
+        logger.error("Error in estimating inter-file interval: " +  str(e) + ". Interval is not updated.")
+
     if monitoring_file != S["monitoring_file"]:
+        prev_mon_file = monitoring_file
+        curr_mon_file = S["monitoring_file"]
         S["monitoring_file"] = monitoring_file
         event_counts = getEntriesFromHisto(S["monitoring_file"])
         if S["reset_events"]:
             S["events_sum"] = 0
             logger.info("Resetting intergrated events counter by user request.")
             S["reset_events"] = False
-        S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts)
+
         S["event_counts"] = event_counts
+            
+        if prev_mon_file != '-':
+            events_between = (datetime.strptime(monitoring_file[0:16], "%Y_%m_%d_%H_%M") - datetime.strptime(S["monitoring_file"][0:16], "%Y_%m_%d_%H_%M")).total_seconds() / inter_file_interval
+            S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts, events_between)
+
         
 checks = (
     checkDataMonitoring,
@@ -167,12 +187,12 @@ class Root(object):
     def index(self):
 
         global state
-
+    
         if state["readout_time"] is not None:
             readout_time = state["readout_time"].strftime('%Y-%m-%d %H:%M:%S')
         else:
             readout_time = 'No readouts.'
-            
+
         s = """
         <HTML>
         <HEAD>
@@ -185,16 +205,17 @@ class Root(object):
         <BODY BGCOLOR="FFFFFF">
         <h1>J-PET J-Lab monitoring</h1>
         <DIV><h2>Status at: %s (last readout time)</h2></DIV>
-        <!-- <DIV><h3>Most recent monitoring file: <a href="http://172.16.32.156/monitoring2/monitoring.htm?filename=%s">%s</a></h3></DIV> --> 
-        <!-- <DIV><h3>Entries from most recent monitoring file %s</h3></DIV> --> 
+        <DIV><h3>Most recent HLD file: %s</h3></DIV>
+        <DIV><h3>Most recent monitoring file: <a href="http://172.16.32.156/jmonitoring/monitoring.htm?filename=%s">%s</a></h3></DIV>
+        <DIV><h3>Entries from most recent monitoring file %s</h3></DIV>
         <CENTER>
         <!-- <IMG SRC="./plots/temp.png" ALIGN="BOTTOM"> --> 
         <IMG SRC="./plots/pressure.png" ALIGN="BOTTOM">
         <!-- <IMG SRC="./plots/patm.png" ALIGN="BOTTOM"> --> 
         <!-- <IMG SRC="./plots/humidities.png" ALIGN="BOTTOM"> --> 
-        <!-- <IMG SRC="./plots/events.png" ALIGN="BOTTOM"> --> 
+        <IMG SRC="./plots/events.png" ALIGN="BOTTOM">
         <DIV>
-        <!-- <IMG SRC="./plots/integrated_events.png" ALIGN="BOTTOM"> --> 
+        <IMG SRC="./plots/integrated_events.png" ALIGN="BOTTOM">
         <form method="get" action="reset_events">        
         <input type="submit" value="Reset counting">
         </form>
@@ -216,6 +237,7 @@ class Root(object):
         </HTML>
         """ % (update_time,
                readout_time,
+               state["last_hld_file"],
                state["monitoring_file"],
                state["monitoring_file"],
                str(state["event_counts"]),

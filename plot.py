@@ -104,14 +104,14 @@ def plotMeteoStuff(data, outpath):
 
 def plotEventCounts(data, outpath):
 
+    data = list(data)
+
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[1], label='Selected events per file')]
-    times = np.array([dp.parse(line[2]) for line in data])
-    counts = np.array([__validateNumber(line[20]) for line in data])
+    times = np.array([dp.parse(entry['MEASUREMENT_TIME']) for entry in data])
+    counts = np.array([__validateNumber(entry['EVENT_COUNTS']) for entry in data])
     __makePlot(gen, (times, counts), 'plots/', 'events.png', 'Events')
 
     gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[1], label='Integrated events')]
-    integrated_counts = np.array([__validateNumber(line[21]) for line in data])
+    integrated_counts = np.array([__validateNumber(entry['EVENTS_SUM']) for entry in data])
     __makePlot(gen, (times, integrated_counts), 'plots/', 'integrated_events.png', 'Total events')
-    
-
 

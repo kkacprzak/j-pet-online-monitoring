@@ -10,7 +10,8 @@ from time import sleep
 
 import serial
 
-USB_DEVICE = "/dev/ttyUSB0"
+GAUGE_DEVICE = "/dev/ttyUSB0"
+HYTELOG_DEVICE = "/dev/ttyUSB0"
 PORT_NUMBER = 5143
 
 sensor_status = {
@@ -51,7 +52,7 @@ def parseGaugeData(data):
 
 
 def readGauge(gauge_no):
-    serial_port = serial.Serial(USB_DEVICE, 9600, timeout=1)
+    serial_port = serial.Serial(GAUGE_DEVICE, 9600, timeout=1)
     query = "PR{}\r\n".format(gauge_no)
 
     # try to send query until ACK is received
@@ -92,7 +93,7 @@ def readGauge(gauge_no):
     return reading
 
 
-def formatData(pressure_data):
+def formatData(pressure_data, hytelog_data):
     current_time = datetime.now()
     timestamp = current_time.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -100,57 +101,92 @@ def formatData(pressure_data):
         "MEASUREMENT_TIME": timestamp,
         "P1": {"value": pressure_data[0], "unit": "Pa"},
         "P2": {"value": pressure_data[1], "unit": "Pa"},
+        "T": {"value": hytelog_data[0], "unit": "C"},
+        "H": {"value": hytelog_data[1], "unit": "%"}
     }
 
-    return json.dumps(data)
+
+def readTempAndHumidity():
+
+    serial_port = serial.Serial(GAUGE_DEVICE, 38400, timeout=1, parity=serial.PARITY_ODD)
+
+    sync_counter = 0
+    chunk = b''
+    while True:
+        chunk = serial_port.readline()
+        if chunk == b'\r\n':
+            if sync_counter == 2:
+                break
+            else:
+                sync_counter = 0
+                continue
+        elif chunk == b'\tX\tX\tX\tX':
+            sync_counter += 1
+            continue
+        else:
+            continue
+
+    chunk = serial_port.readline()
+    serial_port.close()
+    temperature = float(chunk[0:4])/100.
+    humidity = float(chunk[5:10])/200.
+
+    print(temperature, humidity)
 
 
 if __name__ == "__main__":
-    should_continue = True
 
-    # register SIGINT handler to exit gracefully on Ctrl-C
-    def signal_handler(sig, frame):
-        global should_continue
-        logging.info("Ctrl-C/SIGINT received, exiting.")
-        should_continue = False
+    while True:
 
-    signal.signal(signal.SIGINT, signal_handler)
+        readTempAndHumidity()
+        sleep(2)
 
-    logging.basicConfig(
-        filename="vacuum_readout.log",
-        level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s: %(message)s",
-        datefmt="%m/%d/%Y %I:%M:%S %p",
-    )
-
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(None)
-    sock.bind(("", PORT_NUMBER))
-
-    epoll = select.epoll()
-    epoll.register(sock.fileno(), select.EPOLLIN)
-
-    while should_continue:
-        events = epoll.poll(1)
-        for fileno, event in events:
-            if fileno == sock.fileno():
-                query, client_address = sock.recvfrom(1024)
-
-                try:
-                    pressure_data = (readGauge(1), readGauge(2))
-                except Exception as err:
-                    logging.error("Error reading gauges: {}".format(str(err)))
-                    pressure_data = (0, 0)
-
-                logging.info(
-                    "Presure data: "
-                    + str(pressure_data[0])
-                    + ", "
-                    + str(pressure_data[1])
-                )
-
-                data = bytearray(formatData(pressure_data), "utf-8")
-                sock.sendto(data, client_address)
-                logging.info("data has been sent")
-
-    sock.close()
+# if __name__ == "__main__":
+#     should_continue = True
+#
+#     # register SIGINT handler to exit gracefully on Ctrl-C
+#     def signal_handler(sig, frame):
+#         global should_continue
+#         logging.info("Ctrl-C/SIGINT received, exiting.")
+#         should_continue = False
+#
+#     signal.signal(signal.SIGINT, signal_handler)
+#
+#     logging.basicConfig(
+#         filename="vacuum_readout.log",
+#         level=logging.DEBUG,
+#         format="%(asctime)s - %(levelname)s: %(message)s",
+#         datefmt="%m/%d/%Y %I:%M:%S %p",
+#     )
+#
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.settimeout(None)
+#     sock.bind(("", PORT_NUMBER))
+#
+#     epoll = select.epoll()
+#     epoll.register(sock.fileno(), select.EPOLLIN)
+#
+#     while should_continue:
+#         events = epoll.poll(1)
+#         for fileno, event in events:
+#             if fileno == sock.fileno():
+#                 query, client_address = sock.recvfrom(1024)
+#
+#                 try:
+#                     pressure_data = (readGauge(1), readGauge(2))
+#                 except Exception as err:
+#                     logging.error("Error reading gauges: {}".format(str(err)))
+#                     pressure_data = (0, 0)
+#
+#                 logging.info(
+#                     "Presure data: "
+#                     + str(pressure_data[0])
+#                     + ", "
+#                     + str(pressure_data[1])
+#                 )
+#
+#                 data = bytearray(formatData(pressure_data), "utf-8")
+#                 sock.sendto(data, client_address)
+#                 logging.info("data has been sent")
+#
+#     sock.close()

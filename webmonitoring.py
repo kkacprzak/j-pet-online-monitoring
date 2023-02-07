@@ -54,9 +54,9 @@ state = {
     "monitoring_file" : "-",
     "event_counts" : -1,
     "events_sum" : 0,
-    "reset_events": False
+    "reset_events": False,
+    "inter_file_interval" : 20.0
 }
-
 
 def readVacuumData(server_data):
     sock = socket.socket(socket.AF_INET,
@@ -110,6 +110,13 @@ def getDataForPlots(S):
     retro_shift = dt.timedelta(days=-1)
     S["meteo_data"] =  meteo.getRecordsSince(now + retro_shift)
 
+def restoreLastReadout(S):
+    last_readout = list(meteo.getLastReadout())
+    if len(last_readout) == 0:
+        S["events_sum"] = 0
+    else:
+        S["events_sum"] = int(last_readout[-1]["EVENTS_SUM"])
+    
 def makePlots(S):
     data = list(S["meteo_data"])
     plot.plotMeteoStuff(data, plots_path)
@@ -127,11 +134,11 @@ def checkDataMonitoring(S):
         fl = listHLDfiles(mrf)
         S["last_hld_file"] = getMostRecentFile(fl)
     except NoFilesError as e:
-        logger.error("Error in finding most revent HLD file: " +  str(e) + ". Most recent file is not updated.")
+        logger.error("Error in finding most recent HLD file: " +  str(e) + ". Most recent file is not updated.")
 
     try:
-        inter_file_interval = getInterFileInterval(fl)
-    except:
+        S["inter_file_interval"] = getInterFileInterval(fl)
+    except NoFilesError as e:
         logger.error("Error in estimating inter-file interval: " +  str(e) + ". Interval is not updated.")
 
     if monitoring_file != S["monitoring_file"]:
@@ -147,7 +154,7 @@ def checkDataMonitoring(S):
         S["event_counts"] = event_counts
             
         if prev_mon_file != '-':
-            events_between = (datetime.strptime(monitoring_file[0:16], "%Y_%m_%d_%H_%M") - datetime.strptime(S["monitoring_file"][0:16], "%Y_%m_%d_%H_%M")).total_seconds() / inter_file_interval
+            events_between = (datetime.strptime(monitoring_file[0:16], "%Y_%m_%d_%H_%M") - datetime.strptime(S["monitoring_file"][0:16], "%Y_%m_%d_%H_%M")).total_seconds() / S["inter_file_interval"]
             S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts, events_between)
 
         
@@ -207,7 +214,8 @@ class Root(object):
         <DIV><h2>Status at: %s (last readout time)</h2></DIV>
         <DIV><h3>Most recent HLD file: %s</h3></DIV>
         <DIV><h3>Most recent monitoring file: <a href="http://172.16.32.156/jmonitoring/monitoring.htm?filename=%s">%s</a></h3></DIV>
-        <DIV><h3>Entries from most recent monitoring file %s</h3></DIV>
+        <DIV><h3>Entries from most recent monitoring file: %s</h3></DIV>
+        <DIV><h3>Average interval between subsequent HLD files: %s s</h3></DIV>
         <CENTER>
         <!-- <IMG SRC="./plots/temp.png" ALIGN="BOTTOM"> --> 
         <IMG SRC="./plots/pressure.png" ALIGN="BOTTOM">
@@ -241,6 +249,7 @@ class Root(object):
                state["monitoring_file"],
                state["monitoring_file"],
                str(state["event_counts"]),
+               str(state["inter_file_interval"]),
                state["meteo_time_offset"]
         )
            #     self.recent_folder[1],
@@ -332,6 +341,9 @@ if __name__ == '__main__':
     thread1.start()
 
     # control event loop
+
+    restoreLastReadout(state)
+
     while True:
         time.sleep(update_time)
         for f in checks:

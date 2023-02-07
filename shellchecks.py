@@ -9,8 +9,14 @@ class NoFilesError(Exception):
     pass
 
 def getMostRecentFolder(path, folder_name_pattern):
-    list = [(os.path.getmtime(entry), entry) for entry in glob.glob(path + '/'+folder_name_pattern) if os.path.isdir(entry)]
-    return max(list,key=itemgetter(0))[1]
+    """ Returns the path to a folder where the most recent HLD file was written.
+
+    This function only checks files with a *.hld extension to avoid picking up
+    file writes caused by the compression service which may write e.g. bz2 files
+    to older directories."""
+    hld_files = [(os.path.getmtime(entry), entry) for entry in glob.glob(path + '/'+folder_name_pattern + '/*.hld') if os.path.isfile(entry)]
+    latest_hld_file = max(hld_files,key=itemgetter(0))[1] 
+    return os.path.dirname(latest_hld_file)
 
 def listHLDfiles(path):
     file_list = [(os.path.getmtime(entry), entry) for entry in glob.glob(path + '/*.hld') if os.path.isfile(entry)]

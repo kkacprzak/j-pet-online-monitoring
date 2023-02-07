@@ -151,6 +151,29 @@ def getRecordsBetween(beg, end):
         if con:
             con.close()
 
+def getLastReadout():
+    con = None
+    logger.debug( "ATTEMPTING TO OPEN DB: " + db_filename + " FOR READING")
+    
+    try:
+        con = sqlite3.connect(db_filename)
+        cursor = con.cursor()
+
+        sql = 'SELECT '
+        sql += ', '.join(DATA_LABELS.keys())
+        sql += ' FROM %s' % TABLE_NAME
+        sql += ' order by ID desc limit 1;'
+
+        cursor.execute(sql, ())        
+        return map(_tuple2dict, cursor.fetchall())
+
+    except sqlite3.Error as e:
+        logger.error( "Error in querying DB {}:".format(e.args[0]))
+        return ()
+    finally:
+        if con:
+            con.close()
+            
 def recreateTextFile(data):
     '''This method creates a text buffer with conditions data in TSV format'''
     buffer = ""

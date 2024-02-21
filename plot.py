@@ -73,7 +73,7 @@ def plotMeteoStuff(data, outpath):
     ##################################################################
     # plot temperatures                                              #
     ##################################################################
-    gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[1][i], label='T'+str(i)) for i in range(10)]
+    gen = lambda arrs, axis: [axis.plot(arrs[0], arrs[1][i], label='Temperature '+str(i)) for i in range(10)]
     __makePlot(gen, arrays, 'plots/', 'temp.png', 'C')
     
     ##################################################################

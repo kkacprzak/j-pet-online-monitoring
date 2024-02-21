@@ -1,14 +1,29 @@
+from collections import OrderedDict
 import sqlite3
 from datetime import datetime
 import dateutil.parser as dp
-import math
 import logging
-from backports import lzma
+import lzma
 
-table_name = 'conditions'
+TABLE_NAME = 'conditions'
 db_filename = ""
-
 last_db_backup_time = datetime(1970,1,1)
+
+DATA_LABELS = OrderedDict([
+    ('MEASUREMENT_TIME', 'TEXT'),
+    ('SERVER_TIME', 'TEXT'),
+    ('P_ATM', 'REAL'),
+    ('P1', 'REAL'),
+    ('P2', 'REAL'),
+    ('HUM1', 'REAL'),
+    ('HUM2', 'REAL'),
+    ('T0', 'REAL'),
+    ('T1', 'REAL'),
+    ('LAST_HLD_FILE', 'TEXT'),
+    ('LAST_MONITORING_FILE', 'INTEGER'),
+    ('EVENT_COUNTS', 'INTEGER'),
+    ('EVENTS_SUM', 'INTEGER')
+    ])
 
 logger = logging.getLogger('meteo')
 
@@ -26,38 +41,16 @@ def initDB(filename):
 
         cursor.execute(
             '''SELECT name FROM sqlite_master WHERE type='table' 
-            and name='%s';''' % (table_name))
+            and name='%s';''' % (TABLE_NAME))
+
+        query = ', '.join([label + ' ' + DATA_LABELS[label] for label in DATA_LABELS])
+        query = 'CREATE TABLE ' + TABLE_NAME + ' (ID INTEGER PRIMARY KEY AUTOINCREMENT,' + query + ');'
 
         if len(cursor.fetchall()) == 0: # table did not exist
-            cursor.execute(
-                '''CREATE TABLE %s 
-                (ID INTEGER PRIMARY KEY AUTOINCREMENT, 
-                STATION_TIME TEXT,
-                SERVER_TIME TEXT,
-                P_ATM REAL,
-                P1 REAL,
-                P2 REAL,
-                HUM1 REAL,
-                HUM2 REAL,
-                T0 REAL,
-                T1 REAL,
-                T2 REAL,
-                T3 REAL,
-                T4 REAL,
-                T5 REAL,
-                T6 REAL,
-                T7 REAL,
-                T8 REAL,
-                T9 REAL,
-                LAST_HLD TEXT,
-                LAST_MONITORING_FILE TEXT,
-                EVENT_COUNTS INTEGER,
-                EVENTS_SUM INTEGER
-                )''' % (table_name))
+            cursor.execute(query)
             logger.debug("DB table did not exist, creating one.")
     
-    except sqlite3.Error, e:
-
+    except sqlite3.Error as e:
         logger.error( "Error {}:".format(e.args[0]))
         return
 
@@ -65,75 +58,69 @@ def initDB(filename):
         if con:
             con.close()
 
-def extractValue(line, position):
-    words = line[position].split(' ')
-    value = 0.0
-    if words[2]!='NaN':
-        value = float(words[2]) 
-    return value
+def _extractValue(data, label):
+    """ Checks is the provided label exists as a key in the data dictionary
+        and whether it is a scalar value (in which case it is directly returned)
+        or a composite dictionary value (used e.g. for values with units)
+        for which only the value is returned without unit.
+
+        In case the label is not found in data, returns a default value.
+    """
+    label = label.upper()
+    if label in data:
+        if isinstance(data[label], dict) and 'value' in data[label]:
+            return data[label]['value']
+        else:
+            return data[label]
+    else:
+        return 0.0
+
+def _dict2tuple(data):
+    values = []
+
+    for label in DATA_LABELS:
+        values.append(_extractValue(data, label))
+    return tuple(values)
     
-def extractTimestamp(line):
-    words = line[0].split(' ')
-    return datetime.strptime(words[0]+" "+words[1], '%Y-%m-%d %H:%M:%S').isoformat()
-
-def makeData(line, read_time, last_hld, last_monitoring_file, event_count, events_sum):
-
-    data = []
-    line = line.strip()
-    line = line.replace('>', ';').split(';')
-    data.append(extractTimestamp(line))
-    data.append(read_time.isoformat())
-    for pos in xrange(1,16):
-        data.append(extractValue(line, pos))
-    data.append(last_hld)
-    data.append(last_monitoring_file)
-    data.append(event_count)
-    data.append(events_sum)
-    return data
-
-def writeRecord(line, timestamp, hld_file, last_monitoring_file, event_count, events_sum):
-    data = makeData(line, timestamp, hld_file, last_monitoring_file, event_count, events_sum)
-    __writeRecord(data)
-    return data
+def writeRecord(data):
+    data = _dict2tuple(data)
+    _writeRecord(data)
     
-def __writeRecord(data):
+def _writeRecord(data):
     
     con = None
 
-    logger.debug( "ATTEMPTING TO OPEN DB: " + db_filename)
+    logger.debug("ATTEMPTING TO OPEN DB: " + db_filename)
     
     try:
         con = sqlite3.connect(db_filename)
         cursor = con.cursor()
 
-        sql = '''INSERT INTO %s(STATION_TIME,SERVER_TIME,
-        T0,T1,T2,T3,T4,T5,T6,T7,T8,T9,
-        HUM1,HUM2,P_ATM,P1,P2,
-        LAST_HLD,
-        LAST_MONITORING_FILE,
-        EVENT_COUNTS,
-        EVENTS_SUM) 
-        VALUES(
-        ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?,
-        ?,
-        ?,
-        ?
-        );''' % table_name
-        
-        cursor.execute(sql , tuple(data))
+        sql = 'INSERT INTO %s(' % TABLE_NAME
+        sql += ', '.join(DATA_LABELS.keys())
+        sql += ') VALUES('
+        sql += ', '.join(['?' for _item in DATA_LABELS])
+        sql += ');'
+
+        cursor.execute(sql, data)
         con.commit()
 
         logger.debug("INSERT result: " + str(cursor.fetchall()))
         
-    except sqlite3.Error, e:
+    except sqlite3.Error as e:
         logger.error( "Error in inserting {}:".format(e.args[0]))
         return
     finally:
         if con:
             con.close()
+
+def _tuple2dict(tuple_data):
+    d = {}
+    index = 0
+    for item in DATA_LABELS:
+        d[item] = tuple_data[index]
+        index += 1
+    return d
 
 def getRecordsSince(beg):
     end = datetime.now()
@@ -148,24 +135,47 @@ def getRecordsBetween(beg, end):
         con = sqlite3.connect(db_filename)
         cursor = con.cursor()
 
-        sql = """SELECT *
-        FROM "%s" WHERE datetime(SERVER_TIME) BETWEEN datetime(?) and datetime(?) 
-        order by datetime(SERVER_TIME) asc;""" % (table_name,)
+        sql = 'SELECT '
+        sql += ', '.join(DATA_LABELS.keys())
+        sql += ' FROM %s' % TABLE_NAME
+        sql += ' WHERE datetime(SERVER_TIME) BETWEEN datetime(?) and datetime(?)'
+        sql += ' order by datetime(SERVER_TIME) asc;'
 
         cursor.execute(sql, (beg.isoformat(), end.isoformat()))        
-        return cursor.fetchall()
+        return map(_tuple2dict, cursor.fetchall())
 
-    except sqlite3.Error, e:
+    except sqlite3.Error as e:
         logger.error( "Error in querying DB {}:".format(e.args[0]))
         return ()
     finally:
         if con:
             con.close()
 
-def recreateTextFile(data):
-    '''This method creates a text buffer mimicking the format
-    of the text log files produced by the meteo station'''
+def getLastReadout():
+    con = None
+    logger.debug( "ATTEMPTING TO OPEN DB: " + db_filename + " FOR READING")
+    
+    try:
+        con = sqlite3.connect(db_filename)
+        cursor = con.cursor()
 
+        sql = 'SELECT '
+        sql += ', '.join(DATA_LABELS.keys())
+        sql += ' FROM %s' % TABLE_NAME
+        sql += ' order by ID desc limit 1;'
+
+        cursor.execute(sql, ())        
+        return map(_tuple2dict, cursor.fetchall())
+
+    except sqlite3.Error as e:
+        logger.error( "Error in querying DB {}:".format(e.args[0]))
+        return ()
+    finally:
+        if con:
+            con.close()
+            
+def recreateTextFile(data):
+    '''This method creates a text buffer with conditions data in TSV format'''
     buffer = ""
 
     def makeFloat(x):
@@ -174,17 +184,27 @@ def recreateTextFile(data):
         else:
             return str(x)
         
+    headers = DATA_LABELS
+    header_line = "\t".join(headers) + "\n"
+
+    buffer += header_line
+
     for entry in data:
-        line = dp.parse(entry[1]).strftime('%Y-%m-%d %H:%M:%S') + ' > '
-        for i in xrange(10):
-            line = line + '#' + str(i) + ': ' + makeFloat(entry[8+i]) + '; '
-        line = line + 'H0: ' + makeFloat(entry[6]) + '; '
-        line = line + 'H1: ' + makeFloat(entry[7]) + '; '
-        line = line + 'P: ' + makeFloat(entry[3]) + ' Pa; '
-        line = line + 'P1: ' + makeFloat(entry[4]) + ' Pa; '
-        line = line + 'P2: ' + makeFloat(entry[5]) + ' Pa;'
-        line = line + "\n"
-        buffer = buffer + line
+
+        values = [str(entry[item]) for item in DATA_LABELS]
+        line = "\t".join(values) + "\n"
+
+        # line = dp.parse(entry[1]).strftime('%Y-%m-%d %H:%M:%S') + ' > '
+        # for i in xrange(10):
+        #     line = line + '#' + str(i) + ': ' + makeFloat(entry[8+i]) + '; '
+        # line = line + 'H0: ' + makeFloat(entry[6]) + '; '
+        # line = line + 'H1: ' + makeFloat(entry[7]) + '; '
+        # line = line + 'P: ' + makeFloat(entry[3]) + ' Pa; '
+        # line = line + 'P1: ' + makeFloat(entry[4]) + ' Pa; '
+        # line = line + 'P2: ' + makeFloat(entry[5]) + ' Pa;'
+        # line = line + "\n"
+
+        buffer += line
         
     return buffer
 
@@ -196,16 +216,15 @@ def dumpDBtoFile(db_backup_file = './db_backup.sql'):
 
     try:
         con = sqlite3.connect(db_filename)
-        cursor = con.cursor()
         
         with lzma.open(db_backup_file+'.xz', 'w') as f:
             for line in con.iterdump():
-                f.write('%s\n' % line)
+                f.write(str.encode('%s\n' % line))
 
         logger.debug("DB contents were dumped to an SQL file:  " + str(db_backup_file))
         last_db_backup_time = datetime.now()
 
-    except sqlite3.Error, e:
+    except sqlite3.Error:
         logger.error("Error in dumping the DB to an SQL file.")
         return
     finally:
@@ -216,24 +235,24 @@ def dumpDBtoFile(db_backup_file = './db_backup.sql'):
 
 
 if __name__ == "__main__":
+    pass
+    # data = (
+    #     '2019-01-14T14:43:21',
+    #     '2019-01-14T15:43:21',
+    #     1024.,
+    #     0.1,
+    #     0.43,
+    #     0.8,
+    #     0.21,
+    #     24.1, 23.3, 19.0, 39.0, 43.1, 12.1, -1.2, 21.9, 21.8, 27.2, 100.3,
+    #     'dabc_2342367.hld'
+    # )
 
-    data = (
-        '2019-01-14T14:43:21',
-        '2019-01-14T15:43:21',
-        1024.,
-        0.1,
-        0.43,
-        0.8,
-        0.21,
-        24.1, 23.3, 19.0, 39.0, 43.1, 12.1, -1.2, 21.9, 21.8, 27.2, 100.3,
-        'dabc_2342367.hld'
-    )
-
-    # the ultimate test and example of usage
+    # # the ultimate test and example of usage
     
-    initDB('test2.sqlite')    
+    # initDB('test2.sqlite')    
 
-    with open('meteo_data.txt') as f:
-        for line in f:
-            writeRecord(line, datetime.now(), 'zyx')
+    # with open('meteo_data.txt') as f:
+    #     for line in f:
+    #         writeRecord(line, datetime.now(), 'zyx')
 

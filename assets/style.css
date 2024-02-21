@@ -1,0 +1,61 @@
+body {
+    background-color: rgb(190, 223, 234);
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    color: rgb(38, 38, 38);
+    padding: 60px 60px 60px 60px;
+}
+
+.header {
+    margin-bottom: 18px;
+    width: 100%;
+    height: 150px;
+    clear: both;
+}
+
+.header img {
+    float: left;
+    width: 400px;
+    height: auto;
+}
+  
+.header h1 {
+    position: relative;
+    top: 70px;
+    left: 70px;
+    vertical-align: center;
+}
+
+.section {
+    float: left;
+    width:100%;
+    clear:both; 
+    background-color: rgb(130, 175, 190);
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+}
+
+.section h2, h3 {
+    position: relative;
+    left: 18px;
+}
+
+.plots{
+    float:left;
+    width:100%;
+    margin-bottom: 18px;
+}
+
+.plots img {
+    float: inline-start;
+    width:50%;
+    height:auto;
+}
+
+.button{
+    position: relative;
+    float: inline-start;
+    left: 18px;
+    clear: both;
+}
+
+

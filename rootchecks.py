@@ -4,29 +4,34 @@ import os
 import os.path
 from operator import itemgetter
 
-file = '2020_06_17_23_39_dabc_20169232158.root'
+file = 'reference/reference.root'
+
+RAW_DATA_PATH = '/data/DAQ/'
+base_path = '/home/krzysiek/Projects/framework/modularV10/j-pet-online-monitoring/data_monitoring/'
+events_histo_name = 'EventCategorizer subtask 5 stats/S_k1_k2_3 hit evts'
 
 def getEntriesFromHisto(filename):
-    f = TFile('/home/jpet/DataMonitoring2/web/rootfiles/' + str(filename), 'OPEN')
-    h = f.Get('ThreeHitAnalysis subtask 6 stats/AnnhPointXYComp_after2DAngle_3 hit evts')
+    f = TFile(str(base_path)+ 'web/rootfiles/' + str(filename), 'OPEN')
+    h = f.Get(events_histo_name)
     n = h.GetEntries()
     f.Close()
     return n
-
+    
 def getMostRecentMonitoringFile():
-    list = [(os.path.getmtime(entry), os.path.split(entry)[1]) for entry in glob.glob('/home/jpet/DataMonitoring2/web/rootfiles/*.root') if os.path.isfile(entry) and "summary" not in os.path.split(entry)[1]]
+    list = [(os.path.getmtime(entry), os.path.split(entry)[1]) for entry in glob.glob(str(base_path)+'web/rootfiles/*.root') if os.path.isfile(entry) and "summary" not in os.path.split(entry)[1]]
     return max(list,key=itemgetter(0))[1]
 
 def readFrequencyOfFiles():
     freq = -1
-    with open('/home/jpet/DataMonitoring2/frequency.txt', 'r') as f:
+    with open(str(base_path)+'frequency.txt', 'r') as f:
         freq = int(f.read())
     return freq
         
-def calculateEventsIncrement(old_count, new_count):
+def calculateEventsIncrement(old_count, new_count, files_between):
 
     avg_count = 0.5 * (old_count + new_count)
     return avg_count * readFrequencyOfFiles()
     
 if __name__ == '__main__':
-    print getEntriesFromHisto(getMostRecentMonitoringFile())
+    print(getEntriesFromHisto(getMostRecentMonitoringFile()))
+    print(readFrequencyOfFiles())

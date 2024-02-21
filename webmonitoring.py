@@ -8,37 +8,34 @@ from shellchecks import *
 from rootchecks import *
 import time
 import cherrypy
-from cherrypy.lib.static import serve_fileobj
 import signal
 import socket
 import sys
 import os
-import StringIO
+import json
 
 import meteo
 import plot
 
 plots_path = 'plots/'
-daq_path = '/data/DAQ/'
+view_monitoring_files_page = 'http://192.168.0.64:8080/'
 
 db_path = './conditions_db.sqlite'
-db_backup_path = '../db_backup/'
+db_backup_path = './db_backup/'
 
-#update_time = 300 # seconds
-update_time = 60 # seconds
+web_assets_dir = '/path/to/j-pet-online-monitoring/assets/'
 
-# for connection to the meteo station
-sock = socket.socket(socket.AF_INET, # Internet
-                     socket.SOCK_DGRAM) # UDP
-sock.settimeout(10.0)
+update_time = 300 # seconds
+# update_time = 60 # seconds
 
-server_address = ("172.16.32.107", 5143)
+# address of the computer reading the meteo and vacuum
+meteo_station_address = ("192.168.0.65", 5143)
 
 # for writing to DB
 meteo.initDB(db_path)
 
 # init logging
-log_file_name = 'conditions_monitoring_' + time.strftime('%d-%m-%Y_%H-%M') + '.log'
+log_file_name = 'jlab_conditions_monitoring_' + time.strftime('%d-%m-%Y_%H-%M') + '.log'
 logging.basicConfig(filename=log_file_name, level=logging.DEBUG,
                     format = '%(asctime)s - [%(name)s] %(levelname)s: %(message)s',
                     datefmt = '%m/%d/%Y %I:%M:%S %p')
@@ -55,72 +52,121 @@ state = {
     "meteo_data" : [],
     "meteo_time_offset" : 0, # in seconds
     "readout_time" : None,
+    "last_hld_file" : "-",
     "monitoring_file" : "-",
     "event_counts" : -1,
     "events_sum" : 0,
-    "reset_events": False
+    "reset_events": False,
+    "inter_file_interval" : readFrequencyOfFiles()
 }
 
+def readVacuumAndHytelogData(server_data):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(10.0)
 
-def readMeteoStation():
-    sock.sendto("Q", server_address)
+    sock.sendto(b"Q", server_data)
     try:
-        data = sock.recv(1024) # buffer size is 1024 bytes
+        data = sock.recv(1024) 
     except socket.timeout:
-        logger.error("Timeout reached waiting for meteo data, skipping readout")
+        logger.error("Timeout reached waiting for vacuum data, skipping readout")
         raise Exception
-    logger.debug("Received data from meteo server: " + data.strip())
+    finally:
+        sock.close()
+    logger.debug("Received data from vacuum server: " + str(data))
     return data
         
-def checkMeteoStation(S):
+def checkVacuumAndHytelogData(S):
+
+    S['meteo_data'] = None
+
     try:
-        line = readMeteoStation()
-    except Exception as err:
-        logger.error("readMeteoStation failed, skipping this readout")
+        data = readVacuumAndHytelogData(meteo_station_address)
+    except Exception:
+        logger.error("readVacuumAndHytelogData failed, skipping this readout")
         return
     
     read_time = datetime.now()
-    data = meteo.writeRecord(line, read_time, 'zyx', S["monitoring_file"], S["event_counts"], S["events_sum"])
-
-    logger.debug("Written data to DB: " + str(data))
-    # check time offset between meteo028 PC and server
-    dt = dp.parse(data[0]) - read_time
-    S["meteo_time_offset"] = dt.total_seconds()
+    data = json.loads(data.decode())
+    data['SERVER_TIME'] = read_time.strftime('%Y-%m-%dT%H:%M:%S')
+    for label in ('LAST_HLD_FILE', 'MONITORING_FILE','EVENT_COUNTS', 'EVENTS_SUM'):
+        data[label] = S[label.lower()]
     
+    S["meteo_data"] = data
+
+    # check time offset between meteo028 PC and server
+    dt = dp.parse(data['MEASUREMENT_TIME']) - read_time
+    S["meteo_time_offset"] = dt.total_seconds()
+
+def writeDataToDB(S):
+    
+    if S['meteo_data'] is None:
+        logger.debug('Conditions data empty, last readout likely failed. Skipping writing to DB.')
+        return
+
+    meteo.writeRecord(S["meteo_data"])
+    logger.debug("Written data to DB: " + json.dumps(S["meteo_data"]))
+
 def getDataForPlots(S):
     now = datetime.now()
     retro_shift = dt.timedelta(days=-1)
     S["meteo_data"] =  meteo.getRecordsSince(now + retro_shift)
 
+def restoreLastReadout(S):
+    last_readout = list(meteo.getLastReadout())
+    if len(last_readout) == 0:
+        S["events_sum"] = 0
+    else:
+        S["events_sum"] = int(last_readout[-1]["EVENTS_SUM"])
+    
 def makePlots(S):
-    plot.plotMeteoStuff(S["meteo_data"], plots_path)
-    plot.plotEventCounts(S["meteo_data"], plots_path)
+    data = list(S["meteo_data"])
+    plot.plotMeteoStuff(data, plots_path)
+    plot.plotEventCounts(data, plots_path)
     
 def backupDB(S):
-    timestamp = state["readout_time"].strftime('%Y-%m-%dT%H:%M:%S')
+    timestamp = state["readout_time"].strftime('%Y-%m-%d %H:%M:%S')
     if (state["readout_time"] - meteo.last_db_backup_time).days > 0:
         meteo.dumpDBtoFile(db_backup_path + 'db_' + timestamp + '.sql')
 
 def checkDataMonitoring(S):
     monitoring_file = getMostRecentMonitoringFile()
+    folder = getMostRecentFolder(str(daq_path), 'DJ_*')
+    try:
+        file_list = listHLDfiles(folder)
+        S["last_hld_file"] = getMostRecentFile(file_list)
+    except NoFilesError as e:
+        logger.error("Error in finding most recent HLD file: " +  str(e) + ". Most recent file is not updated.")
+
+    try:
+        S["inter_file_interval"] = getInterFileInterval(file_list)
+    except NoFilesError as e:
+        logger.error("Error in estimating inter-file interval: " +  str(e) + ". Interval is not updated.")
+
     if monitoring_file != S["monitoring_file"]:
+        prev_mon_file = monitoring_file
+        curr_mon_file = S["monitoring_file"]
         S["monitoring_file"] = monitoring_file
         event_counts = getEntriesFromHisto(S["monitoring_file"])
         if S["reset_events"]:
             S["events_sum"] = 0
             logger.info("Resetting intergrated events counter by user request.")
             S["reset_events"] = False
-        S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts)
+
         S["event_counts"] = event_counts
+            
+        if prev_mon_file != '-':
+            events_between = (datetime.strptime(monitoring_file[0:16], "%Y_%m_%d_%H_%M") - datetime.strptime(S["monitoring_file"][0:16], "%Y_%m_%d_%H_%M")).total_seconds() / S["inter_file_interval"]
+            S["events_sum"] = S["events_sum"] + calculateEventsIncrement(S["event_counts"], event_counts, events_between)
+
         
 checks = (
-    getDataForPlots,
-    makePlots,
     checkDataMonitoring,
-    checkMeteoStation,
-    backupDB
+    checkVacuumAndHytelogData,
+    writeDataToDB,
+    backupDB,
+    getDataForPlots,
+    makePlots
 )
-
 
 class Root(object):
     
@@ -134,11 +180,10 @@ class Root(object):
             #if last readout was closer than 120 s, do not read out again
             return self.last_readout
         # if last readout was older, read out all relavant parameters
-        #
         file = getMeteoLogFile()
         plotMeteoStuff(file, plots_path)
         file.close()
-        #
+
         self.recent_folder = getMostRecentFolder(daq_path, '????.??.??_????')
         self.recent_file = getMostRecentFile(self.recent_folder[1])
         self.last_readout = current_time
@@ -148,68 +193,79 @@ class Root(object):
     def index(self):
 
         global state
-
+    
         if state["readout_time"] is not None:
             readout_time = state["readout_time"].strftime('%Y-%m-%d %H:%M:%S')
         else:
             readout_time = 'No readouts.'
-            
+
         s = """
         <HTML>
         <HEAD>
-        <TITLE>J-PET Monitoring</TITLE>
-        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-        <meta http-equiv="Pragma" content="no-cache" />
-        <meta http-equiv="Expires" content="0" />
-        <meta http-equiv="refresh" content="%d">
+            <TITLE>J-PET DAQ Monitoring</TITLE>
+            <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+            <meta http-equiv="Pragma" content="no-cache" />
+            <meta http-equiv="Expires" content="0" />
+            <meta http-equiv="refresh" content="%d">
+            <link rel="stylesheet" href="./assets/style.css">
+            <link rel="icon" href="favicon.ico" />
         </HEAD>
-        <BODY BGCOLOR="FFFFFF">
-        <DIV><h2>Status at: %s (last readout time)</h2></DIV>
-        <DIV><h3>Most recent monitoring file: <a href="http://172.16.32.156/monitoring2/monitoring.htm?filename=%s">%s</a></h3></DIV>
-        <DIV><h3>Entries from most recent monitoring file %s</h3></DIV>
-        <CENTER>
-        <IMG SRC="./plots/temp.png" ALIGN="BOTTOM"> 
-        <IMG SRC="./plots/pressure.png" ALIGN="BOTTOM"> 
-        <IMG SRC="./plots/patm.png" ALIGN="BOTTOM"> 
-        <IMG SRC="./plots/humidities.png" ALIGN="BOTTOM"> 
-        <IMG SRC="./plots/events.png" ALIGN="BOTTOM"> 
-        <DIV>
-        <IMG SRC="./plots/integrated_events.png" ALIGN="BOTTOM"> 
-        <form method="get" action="reset_events">        
-        <input type="submit" value="Reset counting">
-        </form>
-        </DIV>
-        </CENTER> 
-        <DIV><h3>Time difference between server and meteo PC: %d seconds</h3></DIV>
-        <DIV>
-        <form method="get" action="fetch_records">
-        <h2>Download conditions data for time range:</h2>
-        From: <input type="date" id="records_range_beg" name="records_range_beg" value="2019-01-16">
-        <input type="time" id="records_range_beg_time" name="records_range_beg_time" value="00:00">
-        To: <input type="date" id="records_range_end" name="records_range_end" value="2019-01-17">
-        <input type="time" id="records_range_end_time" name="records_range_end_time" value="00:00">
-        <br>
-        <input type="submit" value="Download data">
-        </form>
-        </DIV>
+        <BODY>
+            <div class="header">
+                <img src="./assets/jpet-logo.png" alt="J-PET Logo">
+                <h1>DAQ Monitoring</h1>
+            </div>
+        
+            <div class="section">
+                <DIV><h2>Status at: %s (last readout time)</h2></DIV>
+                <DIV><h3>Most recent HLD file: %s</h3></DIV>
+                <DIV><h3>Most recent monitoring file: <a href="%s/monitoring.htm?filename=%s">%s</a></h3></DIV>
+                <DIV><h3>Entries from most recent monitoring file: %s</h3></DIV>
+                <DIV><h3>Average interval between subsequent HLD files: %s s</h3></DIV>
+                <h3>Time difference between server and meteo PC: %d seconds</h3>
+            </div>
+
+            <div class="plots">
+                <img SRC="./plots/temp.png"> 
+                <img SRC="./plots/pressure.png">
+                <img SRC="./plots/patm.png">
+                <img SRC="./plots/humidities.png">
+                <img SRC="./plots/events.png">
+                <img SRC="./plots/integrated_events.png">
+            </div>
+        
+            <div class="section">
+                <h3>Reset counting:</h3>            
+                <form class="button" method="get" action="reset_events">        
+                <input type="submit" value="Reset!">
+                </form>
+            </div>
+            <div class="section">
+                <h3>Download conditions data for time range:</h3>
+
+                <form class="button" method="get" action="fetch_records">
+                From: <input type="date" id="records_range_beg" name="records_range_beg" value="2022-11-18">
+                <input type="time" id="records_range_beg_time" name="records_range_beg_time" value="00:00">
+                To: <input type="date" id="records_range_end" name="records_range_end" value="2022-11-18">
+                <input type="time" id="records_range_end_time" name="records_range_end_time" value="23:59">
+                <br>
+                <input type="submit" value="Download data">
+                </form>
+            </div>
+        
         </BODY>
         </HTML>
         """ % (update_time,
                readout_time,
+               state["last_hld_file"],
+               view_monitoring_files_page,
                state["monitoring_file"],
                state["monitoring_file"],
                str(state["event_counts"]),
+               str(state["inter_file_interval"]),
                state["meteo_time_offset"]
         )
-           #     self.recent_folder[1],
-           #     os.path.basename(self.recent_file[1]),
-           #     str(int(current_time-self.recent_file[0]))
-           # )
 
-        # <DIV><h3>Most recent folder %s</h3></DIV>
-        # <DIV><h3>Most recent HLD file %s</h3></DIV>
-        # <DIV><h3>Last access %s seconds ago</h3></DIV>
-        
         return s
 
     @cherrypy.expose
@@ -219,7 +275,7 @@ class Root(object):
         
     @cherrypy.expose
     def fetch_records(self, records_range_beg, records_range_beg_time, records_range_end, records_range_end_time):
-
+    
         beg_time = datetime.strptime(records_range_beg + 'T' + records_range_beg_time, '%Y-%m-%dT%H:%M')
         end_time = datetime.strptime(records_range_end + 'T' + records_range_end_time, '%Y-%m-%dT%H:%M')
 
@@ -229,21 +285,24 @@ class Root(object):
         )
 
         cherrypy.response.headers['Content-Type'] = "text/plain"
-        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="conditions.txt"'
+        cherrypy.response.headers['Content-Disposition'] = 'attachment; filename="conditions_data.txt"'
 
         records = meteo.getRecordsBetween(beg_time, end_time)
+
         file_path = plots_path + '/conditions_data.txt'
         with open(file_path, 'w') as f:
             f.write(meteo.recreateTextFile(records))
-        buffer = StringIO.StringIO(meteo.recreateTextFile(records))
-        return serve_fileobj(buffer, "application/x-download", "attachment", name="conditions_data.txt")
+        # buffer = StringIO.StringIO(meteo.recreateTextFile(records))
+        # return serve_fileobj(buffer, "application/x-download", "attachment", name="conditions_data.txt")
+        file_path = os.path.join(os.getcwd(), 'plots/conditions_data.txt')
+        return cherrypy.lib.static.serve_file(file_path, 'application/x-download', 'attachment', os.path.basename(file_path))
 
 if __name__ == '__main__':
     conf = {
         'global': {
             # Remove this to auto-reload code on change and output logs
             # directly to the console (dev mode).
-#            'environment': 'production',
+            # 'environment': 'production',
         },
         '/': {
             'tools.sessions.on': True,
@@ -254,6 +313,10 @@ if __name__ == '__main__':
             "tools.staticdir.dir": "plots",
             "tools.staticdir.index": 'index.html',
             "tools.staticdir.root": os.getcwd(),
+        },
+        '/assets': {
+            "tools.staticdir.on": True,
+            "tools.staticdir.dir": web_assets_dir
         }
     }
 
@@ -262,9 +325,7 @@ if __name__ == '__main__':
     def signal_handler(sig, frame):
         print('You pressed Ctrl+C!')
         logger.info("SIGINT received, cleaning up and exiting.")
-
         
-        sock.close()
         cherrypy.engine.exit()
         
         sys.exit(0)
@@ -275,10 +336,10 @@ if __name__ == '__main__':
     def thread1(threadname):
         cherrypy.tree.mount(Root(), '/', conf)        
         cherrypy.config.update({'server.socket_host': '0.0.0.0', })
-        cherrypy.config.update({'server.socket_port': 8000, })
-        cherrypy.config.update({'log.screen': False,
+        cherrypy.config.update({'server.socket_port': 8001, })
+        cherrypy.config.update({'log.screen': True,
                                 'log.access_file': '',
-                                'log.error_file': ''})
+                                'log.error_file': 'chpy_error.log'})
         cherrypy.engine.start()
         cherrypy.engine.block()
 
@@ -289,6 +350,9 @@ if __name__ == '__main__':
     thread1.start()
 
     # control event loop
+
+    restoreLastReadout(state)
+
     while True:
         time.sleep(update_time)
         for f in checks:

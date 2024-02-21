@@ -1,0 +1,14 @@
+{
+    "plots":
+    {"TimeWindowCreator subtask 0 stats" :
+     [
+	 "ThresholdMultiplicity_1_lead",
+	 "ThresholdMultiplicity_2_lead",
+	 "ThresholdMultiplicity_3_lead",
+	 "ThresholdMultiplicity_4_lead"
+     ],
+     "MonitoringPlotter subtask 5 stats"   :
+     [
+     ]
+    }
+}

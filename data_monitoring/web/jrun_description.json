@@ -1,0 +1,141 @@
+{
+    "Plots" : [
+	{
+	    "Title" : "Channel occupancies",
+	    "Directory" : "TimeWindowCreator subtask 0 stats",
+	    "Histo" : "occ_channels",
+	    "Options" : "",
+	    "Description" : "Multiplicities of TDC signals by channel number.",
+	    "Selection criteria" : "(Downscaled)"
+	},
+	{
+	    "Title" : "Good and corrupted TDC times",
+	    "Directory" : "TimeWindowCreator subtask 0 stats",
+	    "Histo" : "reco_flags_chsig",
+	    "Options" : "logy",
+	    "Description" : "\"Corrupted\" SigCh-s (the second bin) originate from lost or corrupted data at the DAQ level. There is always a fraction of them but is should be stable over time. <br><br> Alert if the ratio of the second bin to the first one increases.",
+	    "Selection criteria" : "Every reconstructed hit."
+	},
+	{
+	    "Title" : "TDC times per time window",
+	    "Directory" : "TimeWindowCreator subtask 0 stats",
+	    "Histo" : "chsig_tslot",
+	    "Options" : "",
+	    "Description" : "Number of TDC times recorded within a single 50 microsecond time window od the DAQ system.",
+	    "Selection criteria" : "All raw data."
+	},
+	{
+	    "Title" : "Multiplicity of SiPM signals",
+	    "Directory" : "SignalFinder subtask 1 stats",
+	    "Histo" : "pmsig_sipm",
+	    "Options" : "",
+	    "Description" : "Number of SiPM signals identified on a certain SiPM ID.<br>Should be more or less equal for every SiPM ID. <br>Alert if new spikes or holes appear with respect to the reference.",
+	    "Selection criteria" : "All reconstructed SiPM signals."
+	},
+		{
+	    "Title" : "Size of identified SiPM matrix signals",
+	    "Directory" : "SignalTransformer subtask 2 stats",
+	    "Histo" : "mtxsig_multi",
+	    "Options" : "",
+	    "Description" : "SiPM matrix signals consist of 1-4 SiPM signals from the same matrix.<br>The plot presents frequency of recording a matrix signal with 1,2,3 and 4 SiPM signals in coincidence.",
+	    "Selection criteria" : "All reconstructed SiPM matrix signals."
+		},
+		{
+	    "Title" : "Multiplicity of SiPM matrix signals in a time window",
+	    "Directory" : "SignalTransformer subtask 2 stats",
+	    "Histo" : "mtxsig_tslot",
+	    "Options" : "",
+	    "Description" : "Number of SiPM matrix signals identified within a single 50 microsecond time window od the DAQ system.",
+	    "Selection criteria" : "All reconstructed SiPM signals."
+	},	
+	{
+	    "Title" : "Hit A-B time differences vs scintillator ID",
+	    "Directory" : "HitFinder subtask 3 stats",
+	    "Histo" : "hit_tdiff_scin",
+	    "Options" : "colz",
+	    "Description" : "Time difference between A and B sides of a hit vs ID of the scintillator recording the hit.<br>Should constitute a uniform band.<br>The edges of the band getting jagged indicate calibration going off.<br>Watch out for gaps indicating problematic scintillator.",
+	    "Selection criteria" : "Every reconstructed hit."
+	},
+	{
+	    "Title" : "Multiplicity of hits in a time window",
+	    "Directory" : "HitFinder subtask 3 stats",
+	    "Histo" : "hits_tslot",
+	    "Options" : "",
+	    "Description" : "Number of hits identified within a single 50 microsecond time window od the DAQ system.",
+	    "Selection criteria" : "Every reconstructed hit."
+	},
+	{
+	    "Title" : "Multiplicity of hits per scintillator",
+	    "Directory" : "HitFinder subtask 3 stats",
+	    "Histo" : "hits_scin",
+	    "Options" : "",
+	    "Description" : "Number of hits identified in a particular scintillator.",
+	    "Selection criteria" : "Every reconstructed hit."
+	},
+	{
+	    "Title" : "Hit TOT vs scintillator ID",
+	    "Directory" : "HitFinder subtask 3 stats",
+	    "Histo" : "hit_tot_scin",
+	    "Options" : "colz",
+	    "Description" : "Time Over Threshold (calculated with the rectangular approximation) of  a hit vs ID of the scintillator recording the hit.",
+	    "Selection criteria" : "Every reconstructed hit."
+	},
+	{
+	    "Title" : "Multiplicity of all events inside the file",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "multiplicity",
+	    "Options" : "",
+	    "Description" : "Multiplicity of all reconstructed events within the event time window 2500 #ms. ",
+	    "Selection criteria" : "All reconstructed events"
+	},
+	{
+	    "Title" : "Emission points in XY plane for multiplicity 2",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "raw_XY",
+	    "Options" : "",
+	    "Description" : "X vs Y coordinate of the annhilation point reconstructed for 2 hits events.",
+	    "Selection criteria" : "multiplicity = 2"
+	},
+	{
+	    "Title" : "Emission points in XZ plane for multiplicity 2",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "raw_XZ",
+	    "Options" : "",
+	    "Description" : "X vs Z coordinate of the annhilation point reconstructed for 2 hits events.",
+	    "Selection criteria" : " multiplicity = 2"
+	},
+	{
+	    "Title" : "Time over Threshold for multiplicity 2",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "raw_TOT",
+	    "Options" : "",
+	    "Description" : "Time over Threshold(energy deposition) of all hits for event multiplicity 2.",
+	    "Selection criteria" : "multiplicity = 2"
+	},
+	{
+	    "Title" : "Time over Threshold for multiplicity 2 vs Scintillator ID",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "TOTvsScintID",
+	    "Options" : "",
+	    "Description" : "Time over threshold(energy deposition) vs Scintillator ID of all reconstructed hits for multiplicity 2.",
+	    "Selection criteria" : " multiplicity = 2"
+	},
+	{
+	    "Title" : "Lifetime based on time diff between prompt and mean time of emission, TOF corrected, TOT cut 3-5 on both annihilation gammas and larger than 5 on prompt",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "Lifetime_TOFcorr",
+	    "Options" : "",
+	    "Description" : "Lifetime calculated for multiplicity 3 after TOT cut and Time of Flight correction.",
+	    "Selection criteria" : "multiplicity = 3, prompt selection: TOT > 5 ns*V, Annihilation hit selection: 3 < TOT < 5 ns*V"
+	},
+	{
+	    "Title" : "Difference vs. the sum of two smallest angles in the 3-hit event",
+	    "Directory" : "EventCategorizer subtask 5 stats",
+	    "Histo" : "sumDiff_angles_after2DAngle_3_hit_events",
+	    "Options" : "colz",
+	    "Description" : "Sum vs difference of two smallest angles of reconstructed hit pairs for multiplicity 3.",
+	    "Selection criteria" : "multiplicity = 3, prompt selection: TOT > 5 ns*V, Annihilation hit selection: 3 < TOT < 5 ns*V, angles are ordered from smallest to largest(#theta_1 < #theta_2 < #theta_3)"
+	}
+
+    ]
+}

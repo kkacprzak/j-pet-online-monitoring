@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <!-- <img src="img/004.png" alt="J-PET" height="420" width="42"> -->
+      <title>Read a ROOT file</title>
+      <link rel="shortcut icon" href="img/RootIcon.ico"/>
+      <!--  -->
+            <script type='text/javascript'>
+
+    files = "error";
+
+function getFileList(){
+
+    console.log("GetFileList called");
+
+    // required to avoid caching of te file 
+    var myHeaders = new Headers();
+    myHeaders.append('pragma', 'no-cache');
+    myHeaders.append('cache-control', 'no-cache');
+
+    var myInit = {
+	method: 'GET',
+	headers: myHeaders,
+    };
+
+    var myRequest = new Request('files.json');
+
+
+    return fetch(myRequest, myInit)
+ 	.then(response => response.json())
+ 	.then(function(json){
+	    console.log("dadada");
+    console.log(json["files"])
+	     return json["files"].join(';');
+	}
+    );
+}
+
+document.onreadystatechange = function(){
+    if (document.readyState === 'complete'){
+
+	JSROOT.OpenFile('2017_07_08_00_07_dabc_17188141153.root', function(file) {
+	    file.ReadObject("cat.evt.root/TOT", function(obj) {
+		JSROOT.draw("plot1", obj, "");
+	    });
+	});
+    }
+};
+    
+</script>
+      <!--  -->
+      <!-- <script type="text/javascript" src="scripts/JSRootCore.js?gui"></script> -->
+      <script type="text/javascript" src="scripts/JSRootCore.min.js?2d&io"></script>
+   </head>
+   <body>
+      <div id="plot1" style="width:800px; height:600px">
+      </div>
+   </body>
+</html>
+

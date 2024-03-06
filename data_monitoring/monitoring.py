@@ -81,17 +81,17 @@ if not os.path.isfile(hld_filename):
         sys.exit(4);
 
 # os.system("xz -d dabc*xz")
-hld_filename = hld_filename.rsplit('.',1)[0]
+# hld_filename = hld_filename.rsplit('.',1)[0]
 
 # execute the reconstruction for a given file
 start_time = time.time()
 try:
     FNULL = open(os.devnull, 'w')
     subprocess.check_call([
-       "/home/jpet/monitoring/examples-build/opsAnalysis/opsAnalysis.x",
+       "/home/jpet/monitoring/examples-build/ModularDetectorAnalysis/ModularDetectorAnalysis.x",
         "-t", "hld",
         "-k", "modular",
-        "-u", str(WORKDIR) + "configs/up.hospital.2024.json",
+        "-u", str(WORKDIR) + "configs/up.24.01.json",
         "-l", str(WORKDIR) + "configs/modular_setup_clinical_fixed_ds.json",
         "-i", str(38),
         "-f", hld_filename,

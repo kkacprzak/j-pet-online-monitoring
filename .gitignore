@@ -1,0 +1,5 @@
+*.log
+*.sqlite
+*.xz
+*.pyc
+*.root

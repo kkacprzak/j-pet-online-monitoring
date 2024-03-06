@@ -18,15 +18,14 @@ import meteo
 import plot
 
 plots_path = 'plots/'
-view_monitoring_files_page = 'http://192.168.0.64:8080/'
+view_monitoring_files_page = 'http://0.0.0.0:8080/'
 
 db_path = './conditions_db.sqlite'
 db_backup_path = './db_backup/'
 
-web_assets_dir = '/path/to/j-pet-online-monitoring/assets/'
+web_assets_dir = '/home/jpet/monitoring/j-pet-online-monitoring/assets/'
 
 update_time = 300 # seconds
-# update_time = 60 # seconds
 
 # address of the computer reading the meteo and vacuum
 meteo_station_address = ("192.168.0.65", 5143)

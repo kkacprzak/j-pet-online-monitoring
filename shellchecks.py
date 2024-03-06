@@ -4,8 +4,7 @@ import os.path
 from rootchecks import *
 from operator import itemgetter
 
-# daq_path = '/data/DAQ/'
-daq_path = '/home/krzysiek/data/modular_detector/2024/monitoring_tests/'
+daq_path = '/data/DAQ/'
 
 class NoFilesError(Exception):
     pass

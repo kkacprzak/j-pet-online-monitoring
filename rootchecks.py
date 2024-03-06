@@ -7,8 +7,8 @@ from operator import itemgetter
 file = 'reference/reference.root'
 
 RAW_DATA_PATH = '/data/DAQ/'
-base_path = '/home/krzysiek/Projects/framework/modularV10/j-pet-online-monitoring/data_monitoring/'
-events_histo_name = 'EventCategorizer subtask 5 stats/S_k1_k2_3 hit evts'
+base_path = '/home/jpet/monitoring/j-pet-online-monitoring/data_monitoring'
+events_histo_name = 'EventCategorizer subtask 5 stats/lifetime_2g_prompt'
 
 def getEntriesFromHisto(filename):
     f = TFile(str(base_path)+ 'web/rootfiles/' + str(filename), 'OPEN')

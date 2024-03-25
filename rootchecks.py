@@ -7,7 +7,7 @@ from operator import itemgetter
 file = 'reference/reference.root'
 
 RAW_DATA_PATH = '/data/DAQ/'
-base_path = '/home/jpet/monitoring/j-pet-online-monitoring/data_monitoring'
+base_path = '/home/jpet/monitoring/j-pet-online-monitoring/data_monitoring/'
 events_histo_name = 'EventCategorizer subtask 5 stats/lifetime_2g_prompt'
 
 def getEntriesFromHisto(filename):

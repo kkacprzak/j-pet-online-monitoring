@@ -17,7 +17,7 @@ do
 
 	    	if [ `echo ""$count" % $frequency" | bc` -eq 0 ]  
 	    	then
-		    	python /home/jpet/monitoring/j-pet-online-monitoring/data_monitoring/monitoring.py "$filename"
+		    	python3 /home/jpet/monitoring/j-pet-online-monitoring/data_monitoring/monitoring.py "$filename"
 		    	sleep 10
   	  		fi
 		fi
